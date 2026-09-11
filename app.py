@@ -69,8 +69,9 @@ market = pd.DataFrame({
     "KRX 일평균 약정(조원)": [7.0, 6.7, 10.5, 16.7, 20.2],
     "NXT 일평균 약정(조원)": [3.7, 4.1, 5.0, 11.1, 16.1],
     "리테일 Market Share(%)": [29.4, 27.0, 26.5, 25.7, 25.0],
-    "해외주식 일평균 약정(십억달러)": [1.9, 1.3, 1.4, 1.7, 2.1],
-    "해외주식 거래대금(십억달러)": [228.3, 212.0, 218.4, 280.2, 271.0],
+    # 최근 Monthly IR의 분기 집계값. 2025~2026 공개자료에는 과거와 달리 해외주식 Market Share가 별도 공시되지 않음.
+    "해외주식 일평균 약정(조원)": [1.9, 1.3, 1.4, 1.7, 2.1],
+    "해외주식 시장거래대금(조원)": [228.3, 212.0, 218.4, 280.2, 271.0],
 })
 
 liquidity = pd.DataFrame({
@@ -193,13 +194,34 @@ with tab1:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    c1, c2 = st.columns(2)
-    with c1:
-        fig2 = px.line(market, x="분기", y="해외주식 일평균 약정(십억달러)", markers=True, title="해외주식 일평균 약정")
-        st.plotly_chart(fig2, use_container_width=True)
-    with c2:
-        fig3 = px.line(market, x="분기", y="해외주식 거래대금(십억달러)", markers=True, title="해외주식 거래대금")
-        st.plotly_chart(fig3, use_container_width=True)
+    # 해외도 국내와 동일하게 한 화면에서 시장환경과 키움의 거래활동을 함께 확인
+    # 다만 2025~2026 최근 Monthly IR에는 해외주식 Market Share가 별도 공시되지 않아
+    # 시장거래대금(막대) + 키움 해외주식 일평균 약정(선)으로 구성한다.
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(
+        x=market["분기"],
+        y=market["해외주식 시장거래대금(조원)"],
+        name="해외주식 시장거래대금",
+    ))
+    fig2.add_trace(go.Scatter(
+        x=market["분기"],
+        y=market["해외주식 일평균 약정(조원)"],
+        name="키움 해외주식 일평균 약정",
+        yaxis="y2",
+        mode="lines+markers",
+    ))
+    fig2.update_layout(
+        title="해외주식 시장 거래활동과 키움 해외주식 약정",
+        yaxis=dict(title="시장거래대금 (조원)"),
+        yaxis2=dict(title="키움 일평균 약정 (조원)", overlaying="y", side="right", showgrid=False),
+        legend=dict(orientation="h"),
+        height=460,
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+    st.caption(
+        "※ 최근 2025~2026 Monthly IR에서는 과거 자료와 달리 해외주식 Market Share를 별도로 공시하지 않아, "
+        "동일 기간에는 해외주식 시장거래대금과 키움의 해외주식 일평균 약정을 함께 비교했습니다."
+    )
 
     latest_m = market.iloc[-1]
     prev_m = market.iloc[-2]
@@ -207,15 +229,19 @@ with tab1:
     total_domestic_prev = prev_m["KRX 일평균 약정(조원)"] + prev_m["NXT 일평균 약정(조원)"]
     domestic_change = (total_domestic_latest / total_domestic_prev - 1) * 100
     ms_change = latest_m["리테일 Market Share(%)"] - prev_m["리테일 Market Share(%)"]
+    overseas_contract_change = (latest_m["해외주식 일평균 약정(조원)"] / prev_m["해외주식 일평균 약정(조원)"] - 1) * 100
+    overseas_market_change = (latest_m["해외주식 시장거래대금(조원)"] / prev_m["해외주식 시장거래대금(조원)"] - 1) * 100
 
     st.markdown(
         f'<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
         f'최근 비교구간인 {latest_m["분기"]}의 국내주식 일평균 약정은 KRX와 NXT 합산 약 '
         f'<b>{total_domestic_latest:.1f}조원</b>으로 직전 분기 대비 <b>{domestic_change:+.1f}%</b> 변했습니다. '
         f'같은 기간 리테일 Market Share는 <b>{latest_m["리테일 Market Share(%)"]:.1f}%</b>로 '
-        f'직전 분기 대비 <b>{ms_change:+.1f}%p</b> 변했습니다. '
-        f'따라서 시장 거래활동의 확대·축소와 키움증권의 고객 거래 비중이 같은 방향으로 움직이는지 분리해 볼 수 있습니다. '
-        f'시장 자체가 커졌는지, 또는 키움증권의 경쟁력이 추가로 강화됐는지를 구분하는 것이 핵심입니다.</div>',
+        f'직전 분기 대비 <b>{ms_change:+.1f}%p</b> 변했습니다.<br>'
+        f'해외주식 시장거래대금은 직전 분기 대비 <b>{overseas_market_change:+.1f}%</b>, '
+        f'키움의 해외주식 일평균 약정은 <b>{overseas_contract_change:+.1f}%</b> 변했습니다. '
+        f'국내는 거래규모와 Market Share를 함께 보고, 해외는 최근 공개자료 범위에서 시장 거래규모와 키움 약정의 방향을 비교해 '
+        f'시장 확대 효과와 키움의 거래활동 변화를 구분해 확인합니다.</div>',
         unsafe_allow_html=True,
     )
 
@@ -245,21 +271,24 @@ with tab2:
     st.plotly_chart(fig, use_container_width=True)
 
     latest_e = earnings.iloc[-1]
+    prev_q = earnings.iloc[-2]
     yoy_e = earnings.iloc[-5]
+
+    revenue_qoq = (latest_e["순영업수익"] / prev_q["순영업수익"] - 1) * 100
+    op_qoq = (latest_e["영업이익"] / prev_q["영업이익"] - 1) * 100
+    ni_qoq = (latest_e["당기순이익"] / prev_q["당기순이익"] - 1) * 100
     revenue_yoy = (latest_e["순영업수익"] / yoy_e["순영업수익"] - 1) * 100
     op_yoy2 = (latest_e["영업이익"] / yoy_e["영업이익"] - 1) * 100
-    brokerage_yoy = (latest_e["위탁매매 수수료"] / yoy_e["위탁매매 수수료"] - 1) * 100
-    ib_yoy = (latest_e["IB 수수료"] / yoy_e["IB 수수료"] - 1) * 100
-    interest_yoy = (latest_e["이자손익"] / yoy_e["이자손익"] - 1) * 100
-    st_yoy = (latest_e["S&T/운용손익"] / yoy_e["S&T/운용손익"] - 1) * 100
+    ni_yoy = (latest_e["당기순이익"] / yoy_e["당기순이익"] - 1) * 100
 
     st.markdown(
         f'<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
-        f'2026Q2 순영업수익은 <b>{latest_e["순영업수익"]:,.0f}억원</b>으로 전년동기 대비 <b>{revenue_yoy:+.1f}%</b>, '
-        f'영업이익은 <b>{latest_e["영업이익"]:,.0f}억원</b>으로 <b>{op_yoy2:+.1f}%</b> 증가했습니다. '
-        f'위탁매매 수수료는 <b>{brokerage_yoy:+.1f}%</b>, IB 수수료는 <b>{ib_yoy:+.1f}%</b>, '
-        f'이자손익은 <b>{interest_yoy:+.1f}%</b>, S&T/운용손익은 <b>{st_yoy:+.1f}%</b> 변했습니다. '
-        f'즉 최근 실적 개선은 단순 매출 규모 확대만이 아니라, 어떤 수익원이 얼마나 기여했는지를 함께 봐야 정확히 해석할 수 있습니다.</div>',
+        f'최근 흐름을 보기 위해 전분기와 먼저 비교하면, 2026Q2 순영업수익은 <b>{latest_e["순영업수익"]:,.0f}억원</b>으로 '
+        f'2026Q1 대비 <b>{revenue_qoq:+.1f}%</b>, 영업이익은 <b>{latest_e["영업이익"]:,.0f}억원</b>으로 '
+        f'<b>{op_qoq:+.1f}%</b>, 당기순이익은 <b>{latest_e["당기순이익"]:,.0f}억원</b>으로 <b>{ni_qoq:+.1f}%</b> 변했습니다.<br>'
+        f'전년동기와 비교해도 순영업수익 <b>{revenue_yoy:+.1f}%</b>, 영업이익 <b>{op_yoy2:+.1f}%</b>, '
+        f'당기순이익 <b>{ni_yoy:+.1f}%</b>로 모두 증가했습니다. '
+        f'즉 QoQ로 최근 실적 모멘텀을 확인하고, YoY로 분기별 시장환경 차이에도 개선이 유지되는지를 보조적으로 검증할 수 있습니다.</div>',
         unsafe_allow_html=True,
     )
 
@@ -298,19 +327,34 @@ with tab3:
         c2.metric("영업이익", f"{current['영업이익']:,.0f}억원", f"{op_change:+,.0f}억원")
         c3.metric("비교 분기", prior["분기"])
 
+        # 항목 자체의 증감과 영업이익에 미친 방향을 분리해 표시
+        bridge["표시항목"] = bridge.apply(
+            lambda r: f"{r['항목']}<br>({r['증감']:+,.0f}억원 {'증가' if r['증감'] > 0 else '감소' if r['증감'] < 0 else '변동 없음'})",
+            axis=1,
+        )
         fig = px.bar(
             bridge,
-            x="항목",
+            x="표시항목",
             y="영업이익 방향 기여",
-            title=f"{selected} 실적 변동 요인 ({compare_mode})",
+            hover_data={"항목": True, "증감": ":+,.0f", "영업이익 방향 기여": ":+,.0f", "표시항목": False},
+            title=f"{prior['분기']} → {selected} 영업이익 변동 요인 ({compare_mode})",
         )
-        fig.update_layout(yaxis_title="영업이익 방향 기준 증감(억원)", xaxis_title="")
+        fig.update_layout(yaxis_title="영업이익 영향(억원)", xaxis_title="")
         st.plotly_chart(fig, use_container_width=True)
+        st.caption("막대의 +/−는 각 항목 금액의 증감이 아니라, 해당 변화가 영업이익에 미친 방향을 뜻합니다. 판관비는 비용이므로 증가할수록 영업이익에는 음(-)의 영향을 줍니다.")
 
         top_pos = bridge.iloc[0]
         top_neg = bridge.iloc[-1]
-        st.success(f"가장 큰 긍정 요인: {top_pos['항목']} ({top_pos['영업이익 방향 기여']:+,.0f}억원)")
-        st.warning(f"가장 큰 부담 요인: {top_neg['항목']} ({top_neg['영업이익 방향 기여']:+,.0f}억원)")
+
+        def impact_sentence(row):
+            change_word = "증가" if row["증감"] > 0 else "감소" if row["증감"] < 0 else "변동 없음"
+            return (
+                f"{row['항목']} {abs(row['증감']):,.0f}억원 {change_word} "
+                f"→ 영업이익에 {row['영업이익 방향 기여']:+,.0f}억원 영향"
+            )
+
+        st.success(f"가장 큰 긍정 요인: {impact_sentence(top_pos)}")
+        st.warning(f"가장 큰 부담 요인: {impact_sentence(top_neg)}")
 
         positive = bridge[bridge["영업이익 방향 기여"] > 0]
         negative = bridge[bridge["영업이익 방향 기여"] < 0]
@@ -346,6 +390,21 @@ with tab4:
     c1.metric("3개월 이내 유동성자산", f"{latest_l['3개월 이내 유동성자산']/1_000_000:.1f}조원")
     c2.metric("3개월 이내 유동성부채", f"{latest_l['3개월 이내 유동성부채']/1_000_000:.1f}조원")
     c3.metric("유동성비율", f"{latest_l['유동성비율(%)']:.0f}%")
+
+    with st.popover("유동성비율 계산식·해석 보기"):
+        st.markdown("**유동성비율 계산식**")
+        st.code("유동성비율 = 3개월 이내 유동성자산 ÷ 3개월 이내 유동성부채 × 100")
+        calc_ratio = latest_l["3개월 이내 유동성자산"] / latest_l["3개월 이내 유동성부채"] * 100
+        st.markdown(
+            f"**2026H1 실제 계산**  \n"
+            f"{latest_l['3개월 이내 유동성자산']/1_000_000:.1f}조원 ÷ "
+            f"{latest_l['3개월 이내 유동성부채']/1_000_000:.1f}조원 × 100 "
+            f"≈ **{calc_ratio:.1f}%**"
+        )
+        st.caption(
+            "향후 3개월 이내 지급해야 할 유동성부채 대비 같은 기간 내 현금화 가능한 유동성자산을 "
+            "얼마나 확보하고 있는지를 보는 지표입니다. 공개 보고서의 표시값은 반올림 때문에 직접 계산값과 소폭 차이날 수 있습니다."
+        )
 
     plot_l = liquidity.copy()
     plot_l["유동성자산(조원)"] = plot_l["3개월 이내 유동성자산"] / 1_000_000
@@ -390,14 +449,7 @@ with tab4:
 # 5. 자본적정성·재무리스크
 # ---------------------------------------------------------
 with tab5:
-    h1, h2 = st.columns([4,1])
-    with h1:
-        st.markdown('<div class="question-box"><b>질문</b><br>영업 과정에서 부담하는 위험을 감당할 충분한 자본여력을 확보하고 있는가?</div>', unsafe_allow_html=True)
-    with h2:
-        with st.popover("순자본비율이란?"):
-            st.markdown("**순자본비율 계산식**")
-            st.code("순자본비율 = (영업용순자본 - 총위험액) ÷ 필요유지자기자본 × 100")
-            st.caption("영업용순자본에서 총위험액을 차감한 잉여자본을 필요유지자기자본과 비교한 비율입니다.")
+    st.markdown('<div class="question-box"><b>질문</b><br>영업 과정에서 부담하는 위험을 감당할 충분한 자본여력을 확보하고 있는가?</div>', unsafe_allow_html=True)
 
     latest_c = capital.iloc[-1]
     c1, c2, c3, c4 = st.columns(4)
@@ -405,6 +457,52 @@ with tab5:
     c2.metric("총위험액", f"{latest_c['총위험액']/1_000_000:.2f}조원")
     c3.metric("잉여자본", f"{latest_c['잉여자본']/1_000_000:.2f}조원")
     c4.metric("순자본비율", f"{latest_c['순자본비율(%)']:,.2f}%")
+
+    p1, p2, p3, p4 = st.columns(4)
+    with p1:
+        with st.popover("영업용순자본 설명"):
+            st.markdown("**무엇을 뜻하나요?**")
+            st.write(
+                "증권사가 영업 과정에서 발생할 수 있는 손실을 흡수하는 데 사용할 수 있다고 인정되는 자본입니다. "
+                "재무상태표의 자기자본을 그대로 쓰는 것이 아니라, 규정에 따라 가산·차감항목을 반영해 산정합니다."
+            )
+            st.code("개념적 구조: 자기자본 + 가산항목 - 차감항목")
+            st.caption("즉, 위험을 감당할 수 있는 재무적 완충재의 크기를 보는 출발점입니다.")
+    with p2:
+        with st.popover("총위험액 설명"):
+            st.markdown("**무엇을 뜻하나요?**")
+            st.write(
+                "증권사가 영업하면서 부담하는 여러 위험을 감독규정의 방식에 따라 금액으로 환산해 합산한 값입니다. "
+                "시장위험, 신용위험, 운영위험 등이 대표적입니다."
+            )
+            st.caption(
+                "총위험액 2.86조원은 실제로 2.86조원을 잃을 것이라는 예상손실이 아니라, "
+                "규제상 위험 노출을 위험액으로 환산한 값입니다."
+            )
+    with p3:
+        with st.popover("잉여자본 설명"):
+            st.markdown("**계산식**")
+            st.code("잉여자본 = 영업용순자본 - 총위험액")
+            st.markdown(
+                f"**2026H1 실제 계산**  \n"
+                f"{latest_c['영업용순자본']/1_000_000:.2f}조원 - "
+                f"{latest_c['총위험액']/1_000_000:.2f}조원 ≈ **{latest_c['잉여자본']/1_000_000:.2f}조원**"
+            )
+            st.caption("부담하고 있는 위험을 차감하고도 남아 있는 자본여력을 의미합니다.")
+    with p4:
+        with st.popover("순자본비율 설명"):
+            st.markdown("**계산식**")
+            st.code("순자본비율 = (영업용순자본 - 총위험액) ÷ 필요유지자기자본 × 100")
+            calc_ncr = latest_c["잉여자본"] / latest_c["필요유지자기자본"] * 100
+            st.markdown(
+                f"**2026H1 실제 계산**  \n"
+                f"{latest_c['잉여자본']/100:,.2f}억원 ÷ "
+                f"{latest_c['필요유지자기자본']/100:,.2f}억원 × 100 = **{calc_ncr:,.2f}%**"
+            )
+            st.caption(
+                "각종 위험을 차감하고 남은 자본이 규제상 요구되는 필요유지자기자본의 몇 배인지를 보여줍니다. "
+                "자산이 부채보다 15.9배 많다는 뜻은 아닙니다."
+            )
 
     fig = go.Figure()
     fig.add_trace(go.Bar(x=capital["시점"], y=capital["영업용순자본"]/1_000_000, name="영업용순자본"))
