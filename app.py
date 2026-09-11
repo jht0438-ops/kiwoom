@@ -22,6 +22,11 @@ st.markdown(
         border-left: 5px solid #111827; border-radius:10px; padding:14px 18px;
         background:#f8fafc; margin: 18px 0;
     }
+    .conclusion-box {
+        border-left: 5px solid #2563eb; border-radius:10px; padding:15px 18px;
+        background:#eff6ff; margin: 18px 0 10px 0;
+    }
+    .conclusion-box b {font-size:1.02rem;}
     .diagnosis-card {
         border:1px solid #e5e7eb; border-radius:14px; padding:18px; min-height:150px;
         background:white;
@@ -196,6 +201,24 @@ with tab1:
         fig3 = px.line(market, x="분기", y="해외주식 거래대금(십억달러)", markers=True, title="해외주식 거래대금")
         st.plotly_chart(fig3, use_container_width=True)
 
+    latest_m = market.iloc[-1]
+    prev_m = market.iloc[-2]
+    total_domestic_latest = latest_m["KRX 일평균 약정(조원)"] + latest_m["NXT 일평균 약정(조원)"]
+    total_domestic_prev = prev_m["KRX 일평균 약정(조원)"] + prev_m["NXT 일평균 약정(조원)"]
+    domestic_change = (total_domestic_latest / total_domestic_prev - 1) * 100
+    ms_change = latest_m["리테일 Market Share(%)"] - prev_m["리테일 Market Share(%)"]
+
+    st.markdown(
+        f'<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
+        f'최근 비교구간인 {latest_m["분기"]}의 국내주식 일평균 약정은 KRX와 NXT 합산 약 '
+        f'<b>{total_domestic_latest:.1f}조원</b>으로 직전 분기 대비 <b>{domestic_change:+.1f}%</b> 변했습니다. '
+        f'같은 기간 리테일 Market Share는 <b>{latest_m["리테일 Market Share(%)"]:.1f}%</b>로 '
+        f'직전 분기 대비 <b>{ms_change:+.1f}%p</b> 변했습니다. '
+        f'따라서 시장 거래활동의 확대·축소와 키움증권의 고객 거래 비중이 같은 방향으로 움직이는지 분리해 볼 수 있습니다. '
+        f'시장 자체가 커졌는지, 또는 키움증권의 경쟁력이 추가로 강화됐는지를 구분하는 것이 핵심입니다.</div>',
+        unsafe_allow_html=True,
+    )
+
     st.markdown('<div class="bridge-box"><b>다음 질문</b><br>거래활동의 변화가 실제 키움증권의 수수료수익과 영업이익으로 이어졌는지 확인합니다.</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------
@@ -220,6 +243,25 @@ with tab2:
     fig = px.bar(long, x="분기", y="금액", color="수익원", title="주요 수익원별 추이", barmode="group")
     fig.update_layout(yaxis_title="억원", height=480)
     st.plotly_chart(fig, use_container_width=True)
+
+    latest_e = earnings.iloc[-1]
+    yoy_e = earnings.iloc[-5]
+    revenue_yoy = (latest_e["순영업수익"] / yoy_e["순영업수익"] - 1) * 100
+    op_yoy2 = (latest_e["영업이익"] / yoy_e["영업이익"] - 1) * 100
+    brokerage_yoy = (latest_e["위탁매매 수수료"] / yoy_e["위탁매매 수수료"] - 1) * 100
+    ib_yoy = (latest_e["IB 수수료"] / yoy_e["IB 수수료"] - 1) * 100
+    interest_yoy = (latest_e["이자손익"] / yoy_e["이자손익"] - 1) * 100
+    st_yoy = (latest_e["S&T/운용손익"] / yoy_e["S&T/운용손익"] - 1) * 100
+
+    st.markdown(
+        f'<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
+        f'2026Q2 순영업수익은 <b>{latest_e["순영업수익"]:,.0f}억원</b>으로 전년동기 대비 <b>{revenue_yoy:+.1f}%</b>, '
+        f'영업이익은 <b>{latest_e["영업이익"]:,.0f}억원</b>으로 <b>{op_yoy2:+.1f}%</b> 증가했습니다. '
+        f'위탁매매 수수료는 <b>{brokerage_yoy:+.1f}%</b>, IB 수수료는 <b>{ib_yoy:+.1f}%</b>, '
+        f'이자손익은 <b>{interest_yoy:+.1f}%</b>, S&T/운용손익은 <b>{st_yoy:+.1f}%</b> 변했습니다. '
+        f'즉 최근 실적 개선은 단순 매출 규모 확대만이 아니라, 어떤 수익원이 얼마나 기여했는지를 함께 봐야 정확히 해석할 수 있습니다.</div>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown('<div class="bridge-box"><b>다음 질문</b><br>실적이 변했다면, 어떤 수익원이 그 변화를 만들었는지 항목별로 분해합니다.</div>', unsafe_allow_html=True)
 
@@ -270,6 +312,21 @@ with tab3:
         st.success(f"가장 큰 긍정 요인: {top_pos['항목']} ({top_pos['영업이익 방향 기여']:+,.0f}억원)")
         st.warning(f"가장 큰 부담 요인: {top_neg['항목']} ({top_neg['영업이익 방향 기여']:+,.0f}억원)")
 
+        positive = bridge[bridge["영업이익 방향 기여"] > 0]
+        negative = bridge[bridge["영업이익 방향 기여"] < 0]
+        pos_names = ", ".join(positive["항목"].tolist()[:3]) if not positive.empty else "뚜렷한 긍정 요인 없음"
+        neg_names = ", ".join(negative["항목"].tolist()[:3]) if not negative.empty else "뚜렷한 부담 요인 없음"
+
+        st.markdown(
+            f'<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
+            f'{selected} 영업이익은 {prior["분기"]} 대비 <b>{op_change:+,.0f}억원</b> 변했습니다. '
+            f'가장 큰 긍정 요인은 <b>{top_pos["항목"]}</b>, 가장 큰 부담 요인은 <b>{top_neg["항목"]}</b>으로 나타났습니다. '
+            f'긍정 방향 요인은 {pos_names}, 부담 방향 요인은 {neg_names}입니다. '
+            f'이를 통해 단순히 “영업이익이 증가했다/감소했다”가 아니라, 그 변화가 특정 수익원에 집중됐는지 '
+            f'여러 수익원이 함께 움직였는지를 확인할 수 있습니다.</div>',
+            unsafe_allow_html=True,
+        )
+
     st.markdown(
         '<div class="bridge-box"><b>관점 전환</b><br>'
         '여기까지는 <b>얼마나 잘 벌었고 왜 벌었는가</b>를 확인했습니다. '
@@ -303,6 +360,24 @@ with tab4:
     fig = px.line(plot_l, x="시점", y="유동성비율(%)", markers=True, title="유동성비율 추이")
     fig.update_layout(yaxis_title="%", height=390)
     st.plotly_chart(fig, use_container_width=True)
+
+    prev_l = liquidity.iloc[-2]
+    asset_change = (latest_l["3개월 이내 유동성자산"] / prev_l["3개월 이내 유동성자산"] - 1) * 100
+    liability_change = (latest_l["3개월 이내 유동성부채"] / prev_l["3개월 이내 유동성부채"] - 1) * 100
+    ratio_delta = latest_l["유동성비율(%)"] - prev_l["유동성비율(%)"]
+    gap_latest = latest_l["3개월 이내 유동성자산"] - latest_l["3개월 이내 유동성부채"]
+
+    st.markdown(
+        f'<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
+        f'2026H1 기준 3개월 이내 유동성자산은 약 <b>{latest_l["3개월 이내 유동성자산"]/1_000_000:.1f}조원</b>, '
+        f'유동성부채는 약 <b>{latest_l["3개월 이내 유동성부채"]/1_000_000:.1f}조원</b>으로 '
+        f'유동성자산이 약 <b>{gap_latest/1_000_000:.1f}조원</b> 더 많습니다. '
+        f'유동성비율은 <b>{latest_l["유동성비율(%)"]:.0f}%</b>로 전년말 대비 <b>{ratio_delta:+.0f}%p</b> 변했습니다. '
+        f'같은 기간 유동성자산은 <b>{asset_change:+.1f}%</b>, 유동성부채는 <b>{liability_change:+.1f}%</b> 증가했습니다. '
+        f'따라서 단기 지급의무에 대응할 자산 우위는 유지되고 있지만, 자산과 부채가 동시에 빠르게 확대되고 있어 '
+        f'비율뿐 아니라 양쪽의 증가 속도를 함께 보는 것이 중요합니다.</div>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
         '<div class="bridge-box"><b>다음 질문</b><br>'
@@ -355,6 +430,22 @@ with tab5:
     c.metric("잉여자본 변화", f"{surplus_change/1_000_000:+.2f}조원")
     d.metric("순자본비율 변화", f"{ratio_change:+.2f}%p")
 
+    net_cap_pct = (latest_c["영업용순자본"] / prev_c["영업용순자본"] - 1) * 100
+    risk_pct = (latest_c["총위험액"] / prev_c["총위험액"] - 1) * 100
+    surplus_pct = (latest_c["잉여자본"] / prev_c["잉여자본"] - 1) * 100
+
+    st.markdown(
+        f'<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
+        f'2026H1 지배회사 기준 영업용순자본은 약 <b>{latest_c["영업용순자본"]/1_000_000:.2f}조원</b>, '
+        f'총위험액은 약 <b>{latest_c["총위험액"]/1_000_000:.2f}조원</b>입니다. '
+        f'전년말 대비 영업용순자본은 <b>{net_cap_pct:+.1f}%</b>, 총위험액은 <b>{risk_pct:+.1f}%</b> 증가했지만 '
+        f'잉여자본도 <b>{surplus_pct:+.1f}%</b> 늘었고 순자본비율은 '
+        f'<b>{prev_c["순자본비율(%)"]:,.2f}% → {latest_c["순자본비율(%)"]:,.2f}%</b>로 상승했습니다. '
+        f'즉 위험액이 증가하는 가운데 이를 흡수할 수 있는 자본여력이 더 크게 확대되면서 '
+        f'공개지표상 위험 대비 자본완충력이 강화된 흐름으로 해석할 수 있습니다.</div>',
+        unsafe_allow_html=True,
+    )
+
     st.markdown(
         '<div class="bridge-box"><b>마지막 질문</b><br>'
         '수익성, 단기 유동성, 위험 대비 자본여력을 모두 확인했습니다. '
@@ -394,11 +485,77 @@ with tab6:
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("#### 종합 해석")
+
+    latest_e = earnings.iloc[-1]
+    prior_yoy = earnings.iloc[-5]
+    brokerage_yoy = (latest_e["위탁매매 수수료"] / prior_yoy["위탁매매 수수료"] - 1) * 100
+    ib_yoy = (latest_e["IB 수수료"] / prior_yoy["IB 수수료"] - 1) * 100
+    interest_yoy = (latest_e["이자손익"] / prior_yoy["이자손익"] - 1) * 100
+    st_yoy = (latest_e["S&T/운용손익"] / prior_yoy["S&T/운용손익"] - 1) * 100
+    sgna_yoy = (latest_e["판매비와관리비"] / prior_yoy["판매비와관리비"] - 1) * 100
+
+    latest_l = liquidity.iloc[-1]
+    prev_l = liquidity.iloc[-2]
+    l_gap = latest_l["3개월 이내 유동성자산"] - latest_l["3개월 이내 유동성부채"]
+
+    latest_c = capital.iloc[-1]
+    prev_c = capital.iloc[-2]
+
+    st.markdown("##### 1. 수익성 진단")
+    st.write(
+        f"2026Q2 순영업수익은 {latest_e['순영업수익']:,.0f}억원, 영업이익은 {latest_e['영업이익']:,.0f}억원으로 "
+        f"전년동기 대비 각각 {(latest_e['순영업수익']/prior_yoy['순영업수익']-1)*100:+.1f}%, "
+        f"{(latest_e['영업이익']/prior_yoy['영업이익']-1)*100:+.1f}% 증가했습니다. "
+        "따라서 최근 실적은 외형뿐 아니라 이익 수준에서도 뚜렷한 개선 흐름을 보입니다."
+    )
+
+    st.markdown("##### 2. 수익구조 진단")
+    st.write(
+        f"전년동기 대비 위탁매매 수수료는 {brokerage_yoy:+.1f}%, S&T/운용손익은 {st_yoy:+.1f}%, "
+        f"이자손익은 {interest_yoy:+.1f}% 증가했고 IB 수수료는 {ib_yoy:+.1f}% 변했습니다. "
+        "최근 성장의 가장 강한 축은 위탁매매와 S&T/운용이지만, 이자손익도 함께 개선돼 "
+        "실적 증가가 하나의 수익원에만 의존했다고 보기는 어렵습니다. "
+        f"다만 판매비와관리비도 전년동기 대비 {sgna_yoy:+.1f}% 증가했기 때문에 "
+        "향후에는 수익 성장 속도와 비용 증가 속도의 차이를 함께 점검할 필요가 있습니다."
+    )
+
+    st.markdown("##### 3. 유동성 진단")
+    st.write(
+        f"2026H1 기준 3개월 이내 유동성자산은 약 {latest_l['3개월 이내 유동성자산']/1_000_000:.1f}조원, "
+        f"유동성부채는 약 {latest_l['3개월 이내 유동성부채']/1_000_000:.1f}조원으로 "
+        f"유동성자산이 약 {l_gap/1_000_000:.1f}조원 더 많습니다. "
+        f"유동성비율은 전년말 {prev_l['유동성비율(%)']:.0f}%에서 {latest_l['유동성비율(%)']:.0f}%로 상승했습니다. "
+        "즉 공개지표상 단기 지급의무에 대응할 자산 우위가 유지되고 있습니다. "
+        "다만 유동성자산과 부채가 모두 큰 폭으로 늘고 있으므로 단순 비율 수준만이 아니라 "
+        "자산·부채의 동반 확대 속도도 계속 확인해야 합니다."
+    )
+
+    st.markdown("##### 4. 자본적정성 진단")
+    st.write(
+        f"2026H1 지배회사 기준 영업용순자본은 약 {latest_c['영업용순자본']/1_000_000:.2f}조원, "
+        f"총위험액은 약 {latest_c['총위험액']/1_000_000:.2f}조원, 잉여자본은 약 {latest_c['잉여자본']/1_000_000:.2f}조원입니다. "
+        f"순자본비율은 전년말 {prev_c['순자본비율(%)']:,.2f}%에서 {latest_c['순자본비율(%)']:,.2f}%로 상승했습니다. "
+        "총위험액이 증가했음에도 잉여자본과 순자본비율이 함께 개선됐다는 점에서, "
+        "위험 증가를 흡수할 수 있는 자본여력 역시 확대된 흐름으로 볼 수 있습니다."
+    )
+
+    st.markdown("##### 5. 그래서 어떻게 해석할 수 있나?")
     st.success(
-        "최근 키움증권은 위탁매매와 운용손익을 중심으로 수익성이 크게 개선되었습니다. "
-        "동시에 공개자료상 단기 유동성자산이 유동성부채를 상회하고 있으며, "
-        "순자본비율도 최근 비교시점에서 상승했습니다. 따라서 실적 성장의 원인과 함께 "
-        "유동성·자본여력을 연계해 지속가능성을 점검하는 것이 핵심입니다."
+        "최근 키움증권의 실적 개선은 단순히 한 수익원의 일시적 증가로 설명되기보다 "
+        "위탁매매, S&T/운용, 이자손익 등 복수의 수익원이 함께 개선된 결과로 해석할 수 있습니다. "
+        "동시에 실적 확대 과정에서 단기 유동성자산이 유동성부채를 상회하고 있고, "
+        "위험액 증가에도 순자본비율과 잉여자본이 함께 확대되고 있습니다. "
+        "따라서 공개자료 기준으로는 수익성 개선이 유동성이나 자본적정성을 희생하면서 이루어졌다고 보기 어렵고, "
+        "현재까지는 성장과 재무안정성이 함께 유지되는 흐름으로 판단할 수 있습니다."
+    )
+
+    st.markdown("##### 6. 추가로 점검해야 할 포인트")
+    st.info(
+        "① 최근 위탁매매 수수료의 높은 성장기여가 시장 거래활동 둔화 국면에서도 유지되는지, "
+        "② S&T/운용손익의 변동성이 확대될 경우 전체 이익 안정성이 어떻게 달라지는지, "
+        "③ 판매비와관리비 증가 속도가 수익 성장 속도를 지속적으로 하회하는지, "
+        "④ 유동성자산·부채의 동반 확대 과정에서도 유동성비율이 안정적으로 유지되는지, "
+        "⑤ 총위험액 증가보다 영업용순자본과 잉여자본의 증가가 계속 우위를 유지하는지를 추가로 확인할 필요가 있습니다."
     )
 
     st.caption(
