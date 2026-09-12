@@ -101,6 +101,22 @@ capital = pd.DataFrame({
     "순자본비율(%)": [1049.20, 1058.35, 1119.78, 1355.12, 1593.78],
 })
 
+# 주요 경쟁사 비교
+# 주의: 공개자료의 비교가능 시점이 지표별로 달라 각 열의 기준시점을 별도로 표기
+# ROE: 2025년 별도 기준 / 국내주식 위탁매매 거래대금 점유율: 2024년
+# 국내지점 수: 2024년 말 / 직원 수·당기순이익: 2025년 상반기
+peer = pd.DataFrame({
+    "증권사": ["키움증권", "한국투자증권", "삼성증권", "NH투자증권", "미래에셋증권"],
+    "2025 별도 ROE(%)": [19.9, 17.0, 13.3, 11.4, 5.9],
+    "2024 국내주식 위탁매매 거래대금 점유율(%)": [18.3, 11.3, 6.3, 6.6, 11.0],
+    "2024YE 국내지점 수": [0, 59, 28, 53, 61],
+    "2025H1 직원 수": [1092, 2789, 2601, 3086, 3283],
+    "2025H1 당기순이익(억원)": [5457, 10252, 4831, 4651, 6641],
+})
+peer["2025H1 1인당 순이익(억원)"] = (
+    peer["2025H1 당기순이익(억원)"] / peer["2025H1 직원 수"]
+)
+
 # ---------------------------------------------------------
 # 공통 함수
 # ---------------------------------------------------------
@@ -134,11 +150,12 @@ def direction_text(value):
 # Header
 # ---------------------------------------------------------
 st.title("키움증권 재무·영업 연계 분석")
-st.caption("시장환경 → 거래활동 → 수익구조 → 실적 원인 → 유동성 → 자본적정성 → 종합진단")
+st.caption("경쟁구조 → 시장환경 → 거래활동 → 수익구조 → 실적 원인 → 유동성 → 자본적정성 → 종합진단")
 
 # 탭
-(tab0, tab1, tab2, tab3, tab4, tab5, tab6) = st.tabs([
+(tab0, tab_peer, tab1, tab2, tab3, tab4, tab5, tab6) = st.tabs([
     "종합개요",
+    "경쟁사 비교·자본효율성",
     "영업환경·거래활동",
     "실적·수익구조",
     "실적 원인분해",
@@ -174,7 +191,7 @@ with tab0:
 
     st.markdown("#### 분석 흐름")
     st.info(
-        "시장환경 → 고객 거래활동 → 수익구조 → 실적 원인분해 → "
+        "경쟁사 비교 → 시장환경 → 고객 거래활동 → 수익구조 → 실적 원인분해 → "
         "단기 유동성 점검 → 위험 대비 자본여력 점검 → 최종진단"
     )
 
@@ -184,6 +201,161 @@ with tab0:
     b.metric("영업활동 지표", "최근 비교가능 구간")
     c.metric("재무건전성", "2023H1 ~ 2026H1")
     st.caption("공개된 키움증권 실적보고서·월간 IR·정기보고서에서 확인 가능한 수치만 사용했습니다.")
+
+
+# ---------------------------------------------------------
+# 경쟁사 비교·자본효율성
+# ---------------------------------------------------------
+with tab_peer:
+    st.markdown(
+        '<div class="question-box"><b>질문</b><br>'
+        '키움증권의 리테일 경쟁력은 단순히 시장점유율이 높은 데 그치는가, '
+        '아니면 자본과 인력을 효율적으로 활용하는 사업구조로도 이어지고 있는가?</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("#### 1. 비교의 출발점: 시장 경쟁력과 자본효율성")
+    c1, c2, c3, c4 = st.columns(4)
+
+    kiwoom = peer.loc[peer["증권사"] == "키움증권"].iloc[0]
+    roe_rank = peer["2025 별도 ROE(%)"].rank(ascending=False, method="min").loc[peer["증권사"] == "키움증권"].iloc[0]
+    share_rank = peer["2024 국내주식 위탁매매 거래대금 점유율(%)"].rank(
+        ascending=False, method="min"
+    ).loc[peer["증권사"] == "키움증권"].iloc[0]
+
+    c1.metric("2025 별도 ROE", f'{kiwoom["2025 별도 ROE(%)"]:.1f}%', f"비교 5사 중 {int(roe_rank)}위")
+    c2.metric(
+        "2024 국내주식 거래대금 점유율",
+        f'{kiwoom["2024 국내주식 위탁매매 거래대금 점유율(%)"]:.1f}%',
+        f"비교 5사 중 {int(share_rank)}위",
+    )
+    c3.metric("2024YE 국내지점", f'{int(kiwoom["2024YE 국내지점 수"])}개')
+    c4.metric("2025H1 1인당 순이익", f'{kiwoom["2025H1 1인당 순이익(억원)"]:.2f}억원')
+
+    left, right = st.columns(2)
+
+    with left:
+        roe_plot = peer.sort_values("2025 별도 ROE(%)", ascending=False)
+        fig_roe = px.bar(
+            roe_plot,
+            x="증권사",
+            y="2025 별도 ROE(%)",
+            text_auto=".1f",
+            title="2025년 별도 ROE 비교",
+        )
+        fig_roe.update_layout(yaxis_title="ROE (%)", xaxis_title="", height=420)
+        st.plotly_chart(fig_roe, use_container_width=True)
+
+    with right:
+        share_plot = peer.sort_values(
+            "2024 국내주식 위탁매매 거래대금 점유율(%)", ascending=False
+        )
+        fig_share = px.bar(
+            share_plot,
+            x="증권사",
+            y="2024 국내주식 위탁매매 거래대금 점유율(%)",
+            text_auto=".1f",
+            title="2024년 국내주식 위탁매매 거래대금 점유율 비교",
+        )
+        fig_share.update_layout(yaxis_title="점유율 (%)", xaxis_title="", height=420)
+        st.plotly_chart(fig_share, use_container_width=True)
+
+    st.markdown("#### 2. 점포구조까지 함께 보면 무엇이 다른가?")
+    fig_structure = px.scatter(
+        peer,
+        x="2024YE 국내지점 수",
+        y="2025 별도 ROE(%)",
+        size="2024 국내주식 위탁매매 거래대금 점유율(%)",
+        text="증권사",
+        hover_data={
+            "2025H1 직원 수": ":,",
+            "2025H1 1인당 순이익(억원)": ":.2f",
+            "2024 국내주식 위탁매매 거래대금 점유율(%)": ":.1f",
+        },
+        title="점포구조와 자본효율성",
+        size_max=55,
+    )
+    fig_structure.update_traces(textposition="top center")
+    fig_structure.update_layout(
+        xaxis_title="2024년 말 국내지점 수 (개)",
+        yaxis_title="2025년 별도 ROE (%)",
+        height=500,
+    )
+    st.plotly_chart(fig_structure, use_container_width=True)
+    st.caption(
+        "※ 버블 크기는 2024년 국내주식 위탁매매 거래대금 점유율입니다. "
+        "지점 수와 ROE 사이의 인과관계를 뜻하는 그래프가 아니라, 각 회사의 사업구조를 한 화면에서 비교하기 위한 것입니다."
+    )
+
+    st.markdown("#### 3. 인력 대비 이익창출력")
+    productivity = peer.sort_values("2025H1 1인당 순이익(억원)", ascending=False)
+    fig_productivity = px.bar(
+        productivity,
+        x="증권사",
+        y="2025H1 1인당 순이익(억원)",
+        text_auto=".2f",
+        title="2025년 상반기 직원 1인당 당기순이익",
+    )
+    fig_productivity.update_layout(
+        xaxis_title="",
+        yaxis_title="1인당 순이익 (억원)",
+        height=430,
+    )
+    st.plotly_chart(fig_productivity, use_container_width=True)
+
+    with st.expander("비교 데이터 전체 보기"):
+        display_peer = peer.copy()
+        display_peer["2025 별도 ROE(%)"] = display_peer["2025 별도 ROE(%)"].map(lambda x: f"{x:.1f}")
+        display_peer["2024 국내주식 위탁매매 거래대금 점유율(%)"] = display_peer[
+            "2024 국내주식 위탁매매 거래대금 점유율(%)"
+        ].map(lambda x: f"{x:.1f}")
+        display_peer["2025H1 1인당 순이익(억원)"] = display_peer[
+            "2025H1 1인당 순이익(억원)"
+        ].map(lambda x: f"{x:.2f}")
+        st.dataframe(display_peer, use_container_width=True, hide_index=True)
+
+    st.markdown(
+        '<div class="conclusion-box"><b>이 탭에서 얻을 수 있는 결론</b><br>'
+        '키움증권은 비교 5사 가운데 2024년 국내주식 위탁매매 거래대금 점유율 '
+        '<b>18.3%</b>로 가장 높았고, 2025년 별도 ROE도 <b>19.9%</b>로 가장 높았습니다. '
+        '동시에 2024년 말 국내 영업지점이 없는 온라인 중심 구조이며, '
+        '2025년 상반기 직원 수는 1,092명으로 비교사보다 적지만 직원 1인당 순이익은 약 '
+        '<b>5.00억원</b>으로 가장 높았습니다. '
+        '공개자료만으로 점포구조가 높은 ROE를 직접 만들었다고 단정할 수는 없지만, '
+        '키움의 리테일 경쟁력이 단순한 시장점유율에 그치지 않고 '
+        '<b>자본·인력 효율성이 높은 사업구조와 함께 나타난다</b>는 점은 확인할 수 있습니다.</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="bridge-box"><b>다음 질문</b><br>'
+        '그렇다면 이러한 리테일 경쟁력과 효율적인 사업구조는 최근 시장 거래활동 변화 속에서 '
+        '실제 키움증권의 거래와 수익으로 어떻게 연결되고 있을까요?</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("비교 기준·출처 및 해석 유의사항"):
+        st.write(
+            "- 2025 별도 ROE: 금융투자협회 공시를 인용한 2026년 증권사 비교자료 기준 "
+            "(키움 19.9%, 한국투자 17.0%, 삼성 13.3%, NH 11.4%, 미래에셋 5.9%)."
+        )
+        st.write(
+            "- 2024 국내주식 위탁매매 거래대금 점유율: 2025년 공개 비교자료 기준 "
+            "(키움 18.3%, 한국투자 11.3%, 미래에셋 11.0%, NH 6.6%, 삼성 6.3%)."
+        )
+        st.write(
+            "- 2024년 말 국내지점 수: 금융투자협회·사업보고서 기반 공개 비교자료 기준 "
+            "(키움 0, 미래에셋 61, 한국투자 59, NH 53, 삼성 28)."
+        )
+        st.write(
+            "- 2025H1 직원 수·당기순이익: 각 사 반기보고서 기반 공개 비교자료. "
+            "1인당 순이익은 당기순이익 ÷ 직원 수로 단순 계산했습니다."
+        )
+        st.warning(
+            "각 지표의 기준시점이 서로 다르므로 동일 시점의 인과분석으로 해석하면 안 됩니다. "
+            "또한 ROE는 자본구조·사업포트폴리오·일회성 손익의 영향을 받기 때문에 "
+            "온라인 중심 구조만으로 ROE 차이를 설명하지 않습니다."
+        )
 
 # ---------------------------------------------------------
 # 1. 영업환경·거래활동
@@ -783,4 +955,6 @@ with st.expander("데이터 기준 및 해석 유의사항"):
     st.write("- 시장/영업 데이터: 키움증권 월간 IR 자료에서 확인 가능한 비교가능 구간")
     st.write("- 유동성·자본적정성: 키움증권 정기보고서의 지배회사 기준 재무건전성 지표")
     st.write("- 금액 단위가 서로 다른 원자료는 화면 목적에 맞게 억원·조원으로 환산")
+    st.write("- 경쟁사 비교: 지표별 공개 비교가능 시점이 달라 기준연도를 화면에 개별 표기")
+    st.write("- 경쟁사 비교는 동일 시점의 인과분석이 아니라 사업구조와 효율성의 상대적 위치를 확인하기 위한 보조 분석")
     st.write("- 공개자료만으로 확인할 수 없는 내부 자금운용계획이나 내부회계 통제의 세부 효과성은 추정하지 않음")
